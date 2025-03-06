@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xTerm.js WebSocket Shell</title>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #222; }
+        #terminal { width: 80vw; height: 60vh; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <div id="terminal"></div>
+
+    <script>
+        const term = new Terminal({
+            cursorBlink: true
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+        window.addEventListener("resize", () => fitAddon.fit());
+
+		    async function authenticateAndConnect() {
+		        // TODO: Add authentication
+
+    		    term.writeln("Connecting to WebSocket...");
+
+			      // TODO: Implement shorter timeout and inform user
+
+        	  const socket = new WebSocket("ws://169.254.2.100:8765");
+        	  let connected = false;
+
+        	  socket.onopen = () => {
+            	  term.writeln("WebSocket connected!");
+            	  connected = true;
+        	  };
+
+        	  socket.onmessage = event => {
+            	  let data;
+            	  data = event.data;
+
+            	  term.write(data);  // Display server messages
+        	  };
+
+        	  socket.onerror = error => {
+            	  term.writeln("\r\n[Error] WebSocket error: " + error.message);
+        	  };
+
+        	  socket.onclose = () => {
+            	  term.writeln("\r\n[Disconnected]");
+        	  };
+
+        	  // Capture user input and send to the WebSocket server
+        	  term.onData(data => {
+        		  if (!connected) return;
+            	  socket.send(data);
+        	  });
+        }
+
+        authenticateAndConnect();
+    </script>
+</body>
+</html>
