@@ -163,7 +163,8 @@ class WebSocketHandler:
             )
         finally:
             os.close(self.master_fd)
-            print("run(): WebConnection is completely closed")
+            os.close(self.slave_fd)
+            print("run(): PTY closed")
             self.custom_executor.shutdown(wait=True)
             print("run(): custom_executor shut down")
 
