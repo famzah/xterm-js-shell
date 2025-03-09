@@ -168,10 +168,12 @@ class WebSocketHandler:
             self.custom_executor.shutdown(wait=True)
             print("run(): custom_executor shut down")
 
+        print("run(): exit")
 
 async def handle_connection(websocket):
     handler = WebSocketHandler(websocket)
     await handler.run()
+    print("handle_connection(): WebSocket is completely closed")
 
 async def main():
     async with websockets.serve(handle_connection, "0.0.0.0", 8765) as server:
