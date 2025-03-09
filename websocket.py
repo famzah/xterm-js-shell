@@ -90,6 +90,8 @@ class WebSocketHandler:
                 break
 
         selector.unregister(self.master_fd)
+        selector.close()
+
         print("read_from_shell(): Loop ended")
 
     async def read_from_websocket(self):
