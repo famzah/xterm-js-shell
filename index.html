@@ -19,6 +19,7 @@
         const term = new Terminal({
             cursorBlink: true
         });
+        let connected = false;
 
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
@@ -26,44 +27,53 @@
         fitAddon.fit();
         window.addEventListener("resize", () => fitAddon.fit());
 
-		    async function authenticateAndConnect() {
-		        // TODO: Add authentication
+        function resizeNotify(data) {
+          if (!connected) return;
 
-    		    term.writeln("Connecting to WebSocket...");
-
-			      // TODO: Implement shorter timeout and inform user
-
-        	  const socket = new WebSocket("ws://169.254.2.100:8765");
-        	  let connected = false;
-
-        	  socket.onopen = () => {
-            	  term.writeln("WebSocket connected!");
-            	  connected = true;
-        	  };
-
-        	  socket.onmessage = event => {
-            	  let data;
-            	  data = event.data;
-
-            	  term.write(data);  // Display server messages
-        	  };
-
-        	  socket.onerror = error => {
-            	  term.writeln("\r\n[Error] WebSocket error: " + error.message);
-        	  };
-
-        	  socket.onclose = () => {
-            	  term.writeln("\r\n[Disconnected]");
-        	  };
-
-        	  // Capture user input and send to the WebSocket server
-        	  term.onData(data => {
-        		  if (!connected) return;
-            	  socket.send(data);
-        	  });
+          const escSeq = `\x1b[8;${data.rows};${data.cols}t`;
+          socket.send(escSeq);
         }
 
-        authenticateAndConnect();
+        // TODO: Add authentication
+
+        term.writeln("Connecting to WebSocket...");
+
+        // TODO: Implement shorter timeout and inform user
+
+        const socket = new WebSocket("ws://169.254.2.100:8765");
+
+        socket.onopen = () => {
+            term.writeln("WebSocket connected!");
+            connected = true;
+            resizeNotify({ cols: term.cols, rows: term.rows });
+        };
+
+        socket.onmessage = event => {
+            let data;
+            data = event.data;
+
+            term.write(data);  // Display server messages
+        };
+
+        socket.onerror = error => {
+            term.writeln("\r\n[Error] WebSocket error: " + error.message);
+        };
+
+        socket.onclose = () => {
+            connected = false;
+            term.writeln("\r\n[Disconnected]");
+        };
+
+        // Capture user input and send to the WebSocket server
+        term.onData(data => {
+          if (!connected) return;
+
+          socket.send(data);
+        });
+
+        term.onResize(function (data) {
+          resizeNotify(data);
+        });
     </script>
 </body>
 </html>

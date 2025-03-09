@@ -6,6 +6,8 @@ import pty
 import signal
 import websockets
 import selectors
+import re
+import fcntl, termios, struct
 
 class WebSocketHandler:
     def __init__(self, websocket, user_shell_command = None):
@@ -89,6 +91,8 @@ class WebSocketHandler:
     async def read_from_websocket(self):
         """Reads user input from WebSocket and sends it to the shell."""
 
+        ESCAPE_SEQ_PATTERN = re.compile(r'^\033\[8;(\d+);(\d+)t$')
+
         while True:
             try:
                 message = await asyncio.wait_for(
@@ -107,6 +111,20 @@ class WebSocketHandler:
                     print("read_from_websocket(): No data received from websocket (timeout)")
                     continue
 
+            print("read_from_websocket(): read() -> sending to shell")
+
+            if message.startswith('\033'):
+                m = ESCAPE_SEQ_PATTERN.match(message)
+                if not m:
+                    print("read_from_websocket(): Unknown control sequence; passing it through")
+                else:
+                    print("read_from_websocket(): Terminal resized")
+                    rows = int(m.group(1))
+                    cols = int(m.group(2))
+                    winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                    fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+                    #self.process.send_signal(signal.SIGWINCH) # XXX TODO
+                    continue # don't send to Bash because it echoes the data back
             os.write(self.master_fd, message.encode(
                 encoding='utf-8', errors='strict' # XXX: only UTF-8 is supported
             ))
