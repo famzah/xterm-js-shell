@@ -10,7 +10,7 @@ import re
 import fcntl, termios, struct
 
 class WebSocketHandler:
-    def __init__(self, websocket, user_shell_command = None):
+    def __init__(self, websocket, user_shell_command = None, shell_logout_wait = 1, shell_terminate_wait = 3):
         self.websocket = websocket
 
         if not user_shell_command:
@@ -18,9 +18,10 @@ class WebSocketHandler:
         else:
             self.user_shell_command = user_shell_command
 
+        self.shell_logout_wait = shell_logout_wait # seconds
+        self.shell_terminate_wait = shell_terminate_wait # seconds
+
         self.terminate = False
-        self.shell_logout_wait = 1
-        self.shell_terminate_wait = 3
 
     async def wait_for_shell_exit(self):
         sent_kills = 0
