@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import asyncio
+import concurrent.futures
 import os
 import pty
 import signal
@@ -20,6 +21,8 @@ class WebSocketHandler:
 
         self.shell_logout_wait = shell_logout_wait # seconds
         self.shell_terminate_wait = shell_terminate_wait # seconds
+
+        self.custom_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         self.terminate = False
 
@@ -65,7 +68,7 @@ class WebSocketHandler:
         selector.register(self.master_fd, selectors.EVENT_READ)
 
         while True:
-            events = await loop.run_in_executor(None, selector.select, 1)
+            events = await loop.run_in_executor(self.custom_executor, selector.select, 1)
             if not events:
                 if self.terminate:
                     print("read_from_shell(): This connection is being terminated; exiting")
@@ -74,7 +77,7 @@ class WebSocketHandler:
                     print("read_from_shell(): No data received from shell (timeout)")
                     continue
 
-            output = await loop.run_in_executor(None, os.read, self.master_fd, 1024)
+            output = await loop.run_in_executor(self.custom_executor, os.read, self.master_fd, 1024)
             print("read_from_shell(): read() -> sending to WebSocket")
 
             try:
@@ -126,6 +129,7 @@ class WebSocketHandler:
                     fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
                     #self.process.send_signal(signal.SIGWINCH) # XXX TODO
                     continue # don't send to Bash because it echoes the data back
+
             os.write(self.master_fd, message.encode(
                 encoding='utf-8', errors='strict' # XXX: only UTF-8 is supported
             ))
@@ -158,6 +162,9 @@ class WebSocketHandler:
         finally:
             os.close(self.master_fd)
             print("run(): WebConnection is completely closed")
+            self.custom_executor.shutdown(wait=True)
+            print("run(): custom_executor shut down")
+
 
 async def handle_connection(websocket):
     handler = WebSocketHandler(websocket)
