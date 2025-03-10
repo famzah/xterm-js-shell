@@ -56,10 +56,16 @@ class WebSocketHandler:
                 self.logger.debug_min('wait_for_shell_exit(): This connection is being terminated')
                 if sent_kills < self.shell_logout_wait:
                     self.logger.debug_min('wait_for_shell_exit(): Signalling the shell with SIGHUP to logout')
-                    self.process.send_signal(signal.SIGHUP) # logout # XXX TODO
+                    try:
+                        self.process.send_signal(signal.SIGHUP) # logout # XXX TODO
+                    except:
+                        self.logger.exception('wait_for_shell_exit(): signal.SIGHUP failed')
                 else:
                     self.logger.warning('wait_for_shell_exit(): Signalling the shell with SIGKILL to terminate')
-                    self.process.send_signal(signal.SIGKILL) # forcefully # XXX TODO
+                    try:
+                        self.process.send_signal(signal.SIGKILL) # forcefully # XXX TODO
+                    except:
+                        self.logger.exception('wait_for_shell_exit(): signal.SIGKILL failed')
 
                 if sent_kills > self.shell_terminate_wait:
                     self.logger.error('wait_for_shell_exit(): Shell did not terminate; leaving it alive; hope for the best')
