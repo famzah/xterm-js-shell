@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 import asyncio
 import concurrent.futures
 import os
@@ -246,16 +244,3 @@ class WebSocketHandler:
                 self.logger.exception("run(): custom_executor shutdown failed")
 
         self.logger.info(f'{log_prefix}Closing the WebSocket connection: ' + '; '.join(self.terminate))
-
-async def handle_connection(websocket):
-    handler = WebSocketHandler(websocket)
-    await handler.run()
-    #print("handle_connection(): WebSocket is completely closed")
-
-async def main():
-    async with websockets.serve(handle_connection, "0.0.0.0", 8765) as server:
-        print("WebSocket server started")
-        await server.serve_forever()
-
-if __name__ == "__main__":
-    asyncio.run(main())
