@@ -208,14 +208,7 @@ class WebSocketHandler:
 
         self.logger.debug_min("read_from_websocket(): Loop ended")
 
-    async def run(self):
-        if self.logger.getEffectiveLevel() < logging.INFO: # we are in DEBUG
-            log_prefix = 'run(): '
-        else:
-            log_prefix = ''
-
-        self.logger.info(f'{log_prefix}New WebSocket connection')
-
+    async def _run_shell_and_pass_data(self):
         self.master_fd, self.slave_fd = pty.openpty()
 
         try:
@@ -251,5 +244,15 @@ class WebSocketHandler:
                 self.logger.debug_min("run(): custom_executor shut down")
             except:
                 self.logger.exception("run(): custom_executor shutdown failed")
+
+    async def run(self):
+        if self.logger.getEffectiveLevel() < logging.INFO: # we are in DEBUG
+            log_prefix = 'run(): '
+        else:
+            log_prefix = ''
+
+        self.logger.info(f'{log_prefix}New WebSocket connection')
+
+        await self._run_shell_and_pass_data()
 
         self.logger.info(f'{log_prefix}Closing the WebSocket connection: ' + '; '.join(self.terminate))
