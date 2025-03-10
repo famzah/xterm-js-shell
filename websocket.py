@@ -48,7 +48,7 @@ class WebSocketHandler:
 
         self.terminate = []
 
-    async def wait_for_shell_exit(self):
+    async def _wait_for_shell_exit(self):
         sent_kills = 0
 
         while True:
@@ -94,9 +94,16 @@ class WebSocketHandler:
                 self.logger.debug("wait_for_shell_exit(): Shell process still alive check (timeout)")
                 continue
 
+    async def wait_for_shell_exit(self):
+        try:
+            await self._wait_for_shell_exit()
+        except:
+            self.logger.exception('wait_for_shell_exit(): Unexpected exception')
+            self.terminate.append('Unexpected exception')
+
         self.logger.debug_min("wait_for_shell_exit(): Loop ended")
 
-    async def read_from_shell(self):
+    async def _read_from_shell(self):
         """Reads output from the PTY and sends it to the WebSocket."""
 
         loop = asyncio.get_running_loop()
@@ -131,9 +138,16 @@ class WebSocketHandler:
         selector.unregister(self.master_fd)
         selector.close()
 
+    async def read_from_shell(self):
+        try:
+            await self._read_from_shell()
+        except:
+            self.logger.exception('read_from_shell(): Unexpected exception')
+            self.terminate.append('Unexpected exception')
+
         self.logger.debug_min("read_from_shell(): Loop ended")
 
-    async def read_from_websocket(self):
+    async def _read_from_websocket(self):
         """Reads user input from WebSocket and sends it to the shell."""
 
         ESCAPE_SEQ_PATTERN = re.compile(r'^\033\[8;(\d+);(\d+)t$')
@@ -177,6 +191,13 @@ class WebSocketHandler:
             os.write(self.master_fd, message.encode(
                 encoding='utf-8', errors='strict' # XXX: only UTF-8 is supported
             ))
+
+    async def read_from_websocket(self):
+        try:
+            await self._read_from_websocket()
+        except:
+            self.logger.exception('read_from_websocket(): Unexpected exception')
+            self.terminate.append('Unexpected exception')
 
         self.logger.debug_min("read_from_websocket(): Loop ended")
 
