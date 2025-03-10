@@ -149,7 +149,7 @@ class WebSocketHandler:
         try:
             message = await asyncio.wait_for(
                 self.websocket.recv(),
-                timeout=1
+                timeout=timeout
             )
         except websockets.exceptions.ConnectionClosed:
             _msg = 'WebSocket client disconnected during recv()'
