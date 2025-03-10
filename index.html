@@ -40,7 +40,8 @@
 
         // TODO: Implement shorter timeout and inform user
 
-        const socket = new WebSocket("ws://169.254.2.100:8765");
+        const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const socket = new WebSocket(`${wsProtocol}://${window.location.hostname}:8765`);
 
         socket.onopen = () => {
             term.writeln("WebSocket connected!");
