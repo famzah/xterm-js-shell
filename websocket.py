@@ -23,6 +23,7 @@ class WebSocketHandler:
         shell_terminate_wait = 3
     ):
         self.websocket = websocket
+        self.ws_connected = True
         if not logger:
             if not log_id:
                 log_id = websocket.id
@@ -45,7 +46,7 @@ class WebSocketHandler:
 
         self.custom_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
-        self.terminate = False
+        self.terminate = []
 
     async def wait_for_shell_exit(self):
         sent_kills = 0
@@ -67,12 +68,20 @@ class WebSocketHandler:
                 sent_kills += 1
 
             try:
-                await asyncio.wait_for(
+                retcode = await asyncio.wait_for(
                     self.process.wait(),
                     timeout=1
                 )
                 self.logger.debug_min("wait_for_shell_exit(): Shell process exited; exiting")
-                self.terminate = True
+                if retcode >= 0:
+                    self.terminate.append(f'shell exit code {retcode}')
+                else:
+                    signal_value = -retcode # number
+                    try:
+                        signal_value = signal.Signals(signal_value).name
+                    except:
+                        pass
+                    self.terminate.append(f'shell killed by signal {signal_value}')
                 break
 
             except asyncio.TimeoutError:
@@ -106,8 +115,11 @@ class WebSocketHandler:
                     encoding='utf-8',errors='replace' # XXX: only UTF-8 is supported
                 ))
             except websockets.exceptions.ConnectionClosed:
-                self.logger.debug_min("read_from_shell(): WebSocket client disconnected during send(); exiting")
-                self.terminate = True
+                _msg = 'WebSocket client disconnected during send()'
+                self.logger.debug_min(f'read_from_shell(): {_msg}; exiting')
+                if self.ws_connected:
+                    self.ws_connected = False
+                    self.terminate.append(_msg)
                 break
 
         selector.unregister(self.master_fd)
@@ -127,8 +139,11 @@ class WebSocketHandler:
                     timeout=1
                 )
             except websockets.exceptions.ConnectionClosed:
-                self.logger.debug_min("read_from_websocket(): WebSocket client disconnected during recv(); exiting")
-                self.terminate = True
+                _msg = 'WebSocket client disconnected during recv()'
+                self.logger.debug_min(f'read_from_websocket(): {_msg}; exiting')
+                if self.ws_connected:
+                    self.ws_connected = False
+                    self.terminate.append(_msg)
                 break
             except asyncio.TimeoutError:
                 if self.terminate:
@@ -203,7 +218,7 @@ class WebSocketHandler:
             except:
                 self.logger.exception("run(): custom_executor shutdown failed")
 
-        self.logger.info(f'{log_prefix}Closing the WebSocket connection')
+        self.logger.info(f'{log_prefix}Closing the WebSocket connection: ' + '; '.join(self.terminate))
 
 async def handle_connection(websocket):
     handler = WebSocketHandler(websocket)
