@@ -145,30 +145,39 @@ class WebSocketHandler:
 
         self.logger.debug_min("read_from_shell(): Loop ended")
 
+    async def _read_from_websocket_recv(self, timeout):
+        try:
+            message = await asyncio.wait_for(
+                self.websocket.recv(),
+                timeout=1
+            )
+        except websockets.exceptions.ConnectionClosed:
+            _msg = 'WebSocket client disconnected during recv()'
+            self.logger.debug_min(f'read_from_websocket(): {_msg}; exiting')
+            if self.ws_connected:
+                self.ws_connected = False
+                self.terminate.append(_msg)
+            return None, True # break
+        except asyncio.TimeoutError:
+            if self.terminate:
+                self.logger.debug_min("read_from_websocket(): This connection is being terminated; exiting")
+                return None, True # break
+            else:
+                self.logger.debug("read_from_websocket(): No data received from websocket (timeout)")
+                return None, False # continue
+        return message, None
+
     async def _read_from_websocket(self):
         """Reads user input from WebSocket and sends it to the shell."""
 
         ESCAPE_SEQ_PATTERN = re.compile(r'^\033\[8;(\d+);(\d+)t$')
 
         while True:
-            try:
-                message = await asyncio.wait_for(
-                    self.websocket.recv(),
-                    timeout=1
-                )
-            except websockets.exceptions.ConnectionClosed:
-                _msg = 'WebSocket client disconnected during recv()'
-                self.logger.debug_min(f'read_from_websocket(): {_msg}; exiting')
-                if self.ws_connected:
-                    self.ws_connected = False
-                    self.terminate.append(_msg)
-                break
-            except asyncio.TimeoutError:
-                if self.terminate:
-                    self.logger.debug_min("read_from_websocket(): This connection is being terminated; exiting")
+            message, error = await self._read_from_websocket_recv(1)
+            if message is None:
+                if error:
                     break
                 else:
-                    self.logger.debug("read_from_websocket(): No data received from websocket (timeout)")
                     continue
 
             self.logger.debug("read_from_websocket(): read() -> sending to shell")
