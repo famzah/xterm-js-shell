@@ -9,10 +9,31 @@ import websockets
 import selectors
 import re
 import fcntl, termios, struct
+import logging
+from websocket_logger import WebSocketLoggerFactory
 
 class WebSocketHandler:
-    def __init__(self, websocket, user_shell_command = None, shell_logout_wait = 1, shell_terminate_wait = 3):
+    def __init__(self,
+        websocket,
+        logger = None,
+        log_id = None,
+        log_level=logging.INFO, # with the built-in logger, WebSocketLoggerFactory.DEBUG_MIN is also an option
+        user_shell_command = None,
+        shell_logout_wait = 1,
+        shell_terminate_wait = 3
+    ):
         self.websocket = websocket
+        if not logger:
+            if not log_id:
+                log_id = websocket.id
+            self.logger = WebSocketLoggerFactory(log_id, log_level).getLogger()
+        else:
+            self.logger = logger
+
+        # If a custom `logger` is provided, it may not have `debug_min`.
+        # Ensure `debug_min` exists, otherwise alias it to `debug`.
+        if not hasattr(self.logger, 'debug_min'):
+            self.logger.debug_min = self.logger.debug
 
         if not user_shell_command:
             self.user_shell_command = ['/bin/bash', '-l'] # login shell
@@ -31,16 +52,16 @@ class WebSocketHandler:
 
         while True:
             if self.terminate:
-                print('wait_for_shell_exit(): This connection is being terminated')
+                self.logger.debug_min('wait_for_shell_exit(): This connection is being terminated')
                 if sent_kills < self.shell_logout_wait:
-                    print('wait_for_shell_exit(): Signalling the shell with SIGHUP to logout')
+                    self.logger.debug_min('wait_for_shell_exit(): Signalling the shell with SIGHUP to logout')
                     self.process.send_signal(signal.SIGHUP) # logout # XXX TODO
                 else:
-                    print('wait_for_shell_exit(): Signalling the shell with SIGKILL to terminate')
+                    self.logger.warning('wait_for_shell_exit(): Signalling the shell with SIGKILL to terminate')
                     self.process.send_signal(signal.SIGKILL) # forcefully # XXX TODO
 
                 if sent_kills > self.shell_terminate_wait:
-                    print('wait_for_shell_exit(): Shell did not terminate; leaving it alive; hope for the best')
+                    self.logger.error('wait_for_shell_exit(): Shell did not terminate; leaving it alive; hope for the best')
                     break
 
                 sent_kills += 1
@@ -50,15 +71,15 @@ class WebSocketHandler:
                     self.process.wait(),
                     timeout=1
                 )
-                print("wait_for_shell_exit(): Shell process exited; exiting")
+                self.logger.debug_min("wait_for_shell_exit(): Shell process exited; exiting")
                 self.terminate = True
                 break
 
             except asyncio.TimeoutError:
-                print("wait_for_shell_exit(): Shell process still alive check (timeout)")
+                self.logger.debug("wait_for_shell_exit(): Shell process still alive check (timeout)")
                 continue
 
-        print("wait_for_shell_exit(): Loop ended")
+        self.logger.debug_min("wait_for_shell_exit(): Loop ended")
 
     async def read_from_shell(self):
         """Reads output from the PTY and sends it to the WebSocket."""
@@ -71,28 +92,28 @@ class WebSocketHandler:
             events = await loop.run_in_executor(self.custom_executor, selector.select, 1)
             if not events:
                 if self.terminate:
-                    print("read_from_shell(): This connection is being terminated; exiting")
+                    self.logger.debug_min("read_from_shell(): This connection is being terminated; exiting")
                     break
                 else:
-                    print("read_from_shell(): No data received from shell (timeout)")
+                    self.logger.debug("read_from_shell(): No data received from shell (timeout)")
                     continue
 
             output = await loop.run_in_executor(self.custom_executor, os.read, self.master_fd, 1024)
-            print("read_from_shell(): read() -> sending to WebSocket")
+            self.logger.debug("read_from_shell(): read() -> sending to WebSocket")
 
             try:
                 await self.websocket.send(output.decode(
                     encoding='utf-8',errors='replace' # XXX: only UTF-8 is supported
                 ))
             except websockets.exceptions.ConnectionClosed:
-                print("read_from_shell(): WebSocket client disconnected during send(); exiting")
+                self.logger.debug_min("read_from_shell(): WebSocket client disconnected during send(); exiting")
                 self.terminate = True
                 break
 
         selector.unregister(self.master_fd)
         selector.close()
 
-        print("read_from_shell(): Loop ended")
+        self.logger.debug_min("read_from_shell(): Loop ended")
 
     async def read_from_websocket(self):
         """Reads user input from WebSocket and sends it to the shell."""
@@ -106,25 +127,25 @@ class WebSocketHandler:
                     timeout=1
                 )
             except websockets.exceptions.ConnectionClosed:
-                print("read_from_websocket(): WebSocket client disconnected during recv(); exiting")
+                self.logger.debug_min("read_from_websocket(): WebSocket client disconnected during recv(); exiting")
                 self.terminate = True
                 break
             except asyncio.TimeoutError:
                 if self.terminate:
-                    print("read_from_websocket(): This connection is being terminated; exiting")
+                    self.logger.debug_min("read_from_websocket(): This connection is being terminated; exiting")
                     break
                 else:
-                    print("read_from_websocket(): No data received from websocket (timeout)")
+                    self.logger.debug("read_from_websocket(): No data received from websocket (timeout)")
                     continue
 
-            print("read_from_websocket(): read() -> sending to shell")
+            self.logger.debug("read_from_websocket(): read() -> sending to shell")
 
             if message.startswith('\033'):
                 m = ESCAPE_SEQ_PATTERN.match(message)
                 if not m:
-                    print("read_from_websocket(): Unknown control sequence; passing it through")
+                    self.logger.debug("read_from_websocket(): Unknown control sequence; passing it through")
                 else:
-                    print("read_from_websocket(): Terminal resized")
+                    self.logger.debug_min("read_from_websocket(): Terminal resized")
                     rows = int(m.group(1))
                     cols = int(m.group(2))
                     winsize = struct.pack("HHHH", rows, cols, 0, 0)
@@ -136,10 +157,15 @@ class WebSocketHandler:
                 encoding='utf-8', errors='strict' # XXX: only UTF-8 is supported
             ))
 
-        print("read_from_websocket(): Loop ended")
+        self.logger.debug_min("read_from_websocket(): Loop ended")
 
     async def run(self):
-        print("run(): New WebSocket connection")
+        if self.logger.getEffectiveLevel() < logging.INFO: # we are in DEBUG
+            log_prefix = 'run(): '
+        else:
+            log_prefix = ''
+
+        self.logger.info(f'{log_prefix}New WebSocket connection')
 
         self.master_fd, self.slave_fd = pty.openpty()
 
@@ -153,27 +179,36 @@ class WebSocketHandler:
                     preexec_fn=os.setsid  # Start a new session
                 )
             except:
-                await self.websocket.send('Unable to start shell')
-                raise
+                self.process = None
+                self.logger.exception(f'run(): Unable to start shell')
+                await self.websocket.send('Error: Unable to start shell')
 
-            await asyncio.gather(
-                self.read_from_shell(),
-                self.read_from_websocket(),
-                self.wait_for_shell_exit()
-            )
+            if self.process:
+                await asyncio.gather(
+                    self.read_from_shell(),
+                    self.read_from_websocket(),
+                    self.wait_for_shell_exit()
+                )
         finally:
-            os.close(self.master_fd)
-            os.close(self.slave_fd)
-            print("run(): PTY closed")
-            self.custom_executor.shutdown(wait=True)
-            print("run(): custom_executor shut down")
+            try:
+                os.close(self.master_fd)
+                os.close(self.slave_fd)
+                self.logger.debug_min("run(): PTY closed")
+            except:
+                self.logger.exception("run(): PTY close failed")
 
-        print("run(): exit")
+            try:
+                self.custom_executor.shutdown(wait=True)
+                self.logger.debug_min("run(): custom_executor shut down")
+            except:
+                self.logger.exception("run(): custom_executor shutdown failed")
+
+        self.logger.info(f'{log_prefix}Closing the WebSocket connection')
 
 async def handle_connection(websocket):
     handler = WebSocketHandler(websocket)
     await handler.run()
-    print("handle_connection(): WebSocket is completely closed")
+    #print("handle_connection(): WebSocket is completely closed")
 
 async def main():
     async with websockets.serve(handle_connection, "0.0.0.0", 8765) as server:
