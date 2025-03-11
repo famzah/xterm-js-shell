@@ -5,7 +5,7 @@ import websockets
 from websocket_handler import WebSocketHandler
 
 async def handle_connection(websocket):
-    handler = WebSocketHandler(websocket)
+    handler = WebSocketHandler(websocket, auth_callback = None)
     await handler.run()
     #print("handle_connection(): WebSocket is completely closed")
 

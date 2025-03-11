@@ -34,7 +34,11 @@
           socket.send(escSeq);
         }
 
-        // TODO: Add authentication
+        function getQueryParam(param) {
+          const queryString = window.location.search;
+          const urlParams = new URLSearchParams(queryString);
+          return urlParams.get(param);
+        }
 
         term.writeln("Connecting to WebSocket...");
 
@@ -46,6 +50,16 @@
         socket.onopen = () => {
             term.writeln("WebSocket connected!");
             connected = true;
+
+            const auth_example = getQueryParam('auth_example');
+            if (auth_example !== null) {
+              console.log('Sending authentication');
+              socket.send(JSON.stringify({
+                'token': 'abc',
+                'signature': auth_example,
+              }));
+            }
+
             resizeNotify({ cols: term.cols, rows: term.rows });
         };
 

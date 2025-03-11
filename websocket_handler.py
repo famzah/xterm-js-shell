@@ -13,12 +13,14 @@ from websocket_logger import WebSocketLoggerFactory
 class WebSocketHandler:
     def __init__(self,
         websocket,
+        auth_callback,
         logger = None,
         log_id = None,
         log_level=logging.INFO, # with the built-in logger, WebSocketLoggerFactory.DEBUG_MIN is also an option
         user_shell_command = None,
         shell_logout_wait = 1,
-        shell_terminate_wait = 3
+        shell_terminate_wait = 3,
+        auth_timeout = 5
     ):
         self.websocket = websocket
         self.ws_connected = True
@@ -41,6 +43,9 @@ class WebSocketHandler:
 
         self.shell_logout_wait = shell_logout_wait # seconds
         self.shell_terminate_wait = shell_terminate_wait # seconds
+
+        self.auth_callback = auth_callback
+        self.auth_timeout = auth_timeout
 
         self.custom_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
@@ -245,6 +250,19 @@ class WebSocketHandler:
             except:
                 self.logger.exception("run(): custom_executor shutdown failed")
 
+    async def auth(self):
+        message, error = await self._read_from_websocket_recv(self.auth_timeout)
+        if message is None:
+            self.logger.info('auth(): Unable to receive the authentication data')
+            return False
+
+        try:
+            return await self.auth_callback(message, self.websocket, self.logger)
+        except:
+            self.logger.exception("auth(): auth_callback() failed")
+
+        return False
+
     async def run(self):
         if self.logger.getEffectiveLevel() < logging.INFO: # we are in DEBUG
             log_prefix = 'run(): '
@@ -253,6 +271,18 @@ class WebSocketHandler:
 
         self.logger.info(f'{log_prefix}New WebSocket connection')
 
-        await self._run_shell_and_pass_data()
+        if self.auth_callback is None:
+            self.logger.warning('auth(): No authentication configured')
+            auth_ok = True
+        else:
+            auth_ok = await self.auth()
+            if not auth_ok:
+                self.logger.info(f'auth(): Authentication failed')
+                self.terminate.append('Authentication failed')
+            else:
+                self.logger.info(f'auth(): Authentication successful')
+
+        if auth_ok:
+            await self._run_shell_and_pass_data()
 
         self.logger.info(f'{log_prefix}Closing the WebSocket connection: ' + '; '.join(self.terminate))
