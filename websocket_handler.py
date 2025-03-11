@@ -18,6 +18,7 @@ class WebSocketHandler:
         log_id = None,
         log_level=logging.INFO, # with the built-in logger, WebSocketLoggerFactory.DEBUG_MIN is also an option
         user_shell_command = None,
+        shutdown_event = None,
         shell_logout_wait = 1,
         shell_terminate_wait = 3,
         auth_timeout = 5
@@ -44,12 +45,19 @@ class WebSocketHandler:
         self.shell_logout_wait = shell_logout_wait # seconds
         self.shell_terminate_wait = shell_terminate_wait # seconds
 
+        self.shutdown_event = shutdown_event
+
         self.auth_callback = auth_callback
         self.auth_timeout = auth_timeout
 
         self.custom_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         self.terminate = []
+
+    def handle_shutdown_event(self, func_name): 
+        if self.shutdown_event is not None and self.shutdown_event.is_set():
+            self.logger.debug_min(f"{func_name}: Shutdown event; exiting")
+            self.terminate.append('Shutdown event')
 
     async def _wait_for_shell_exit(self):
         sent_kills = 0
@@ -95,6 +103,7 @@ class WebSocketHandler:
 
             except asyncio.TimeoutError:
                 self.logger.debug("wait_for_shell_exit(): Shell process still alive check (timeout)")
+                self.handle_shutdown_event('wait_for_shell_exit()')
                 continue
 
     async def wait_for_shell_exit(self):
@@ -121,6 +130,7 @@ class WebSocketHandler:
                     break
                 else:
                     self.logger.debug("read_from_shell(): No data received from shell (timeout)")
+                    self.handle_shutdown_event('read_from_shell()')
                     continue
 
             output = await loop.run_in_executor(self.custom_executor, os.read, self.master_fd, 1024)
@@ -169,6 +179,7 @@ class WebSocketHandler:
                 return None, True # break
             else:
                 self.logger.debug("read_from_websocket(): No data received from websocket (timeout)")
+                self.handle_shutdown_event('read_from_websocket()')
                 return None, False # continue
         return message, None
 
