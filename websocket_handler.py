@@ -60,13 +60,13 @@ class WebSocketHandler:
                 if sent_kills < self.shell_logout_wait:
                     self.logger.debug_min('wait_for_shell_exit(): Signalling the shell with SIGHUP to logout')
                     try:
-                        self.process.send_signal(signal.SIGHUP) # logout # XXX TODO
+                        self.process.send_signal(signal.SIGHUP) # logout
                     except:
                         self.logger.exception('wait_for_shell_exit(): signal.SIGHUP failed')
                 else:
                     self.logger.warning('wait_for_shell_exit(): Signalling the shell with SIGKILL to terminate')
                     try:
-                        self.process.send_signal(signal.SIGKILL) # forcefully # XXX TODO
+                        self.process.send_signal(signal.SIGKILL) # forcefully
                     except:
                         self.logger.exception('wait_for_shell_exit(): signal.SIGKILL failed')
 
@@ -197,7 +197,7 @@ class WebSocketHandler:
                     cols = int(m.group(2))
                     winsize = struct.pack("HHHH", rows, cols, 0, 0)
                     fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
-                    #self.process.send_signal(signal.SIGWINCH) # XXX TODO
+                    #self.process.send_signal(signal.SIGWINCH) # XXX: couldn't find a way to test this
                     continue # don't send to Bash because it echoes the data back
 
             os.write(self.master_fd, message.encode(
