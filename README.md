@@ -1,6 +1,9 @@
 # xterm-js-shell
 Start a direct web Bash shell using Xterm.js - no SSH connection required. This is a single-user shell that runs with the privileges of the process that started it, and it can handle multiple simultaneous connections.
 
+![zzz](screenshot-xterm.png)
+
+# Architecture
 The project is based on "asyncio" and supports authentication, detailed logging, and graceful shell termination.
 
 The graceful termination feature allows you to run the web shell server in a "socket activation" mode. You can start the server on demand and terminate it when there are no active connections for a while. A typical use case is to launch the web shell server as part of the initial authentication process.
