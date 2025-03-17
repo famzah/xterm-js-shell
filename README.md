@@ -1,4 +1,4 @@
-# xterm-js-shell
+# About
 Start a direct web Bash shell using Xterm.js - no SSH connection required. This is a single-user shell that runs with the privileges of the process that started it, and it can handle multiple simultaneous connections.
 
 ![screenshot](screenshot-xterm.png)
@@ -32,3 +32,16 @@ Example authentication process:
 - The authentication system generates a JWT token. Up to this point, the web shell server is not involved, yet.
 - The web "index.html" page then connects to the web shell server and provides the JWT token.
 - The JWT token is validated by the implementation of auth_callback().
+
+# WebSocketHandler parameters
+The "WebSocketHandler" is the code which handles an [asyncio web server](https://websockets.readthedocs.io/en/stable/reference/asyncio/server.html#creating-a-server) connection. It is provided by "websocket_handler.py" and has the following options:
+- **websocket**: The WebSocket connection instance.
+- **auth_callback**: A function to authenticate the connection. Should accept (message, websocket, logger) and return a boolean indicating success.
+- **logger** (Optional): A custom logger instance. If omitted, a logger is created using WebSocketLoggerFactory which is implemented in "websocket_logger.py".
+- **log_id** (Optional): Identifier for logging. Defaults to `websocket.id` if no custom logger is provided.
+- **log_level** (Optional): Logging level (default: logging.INFO). If you use the default WebSocketLoggerFactory, you can also use `WebSocketLoggerFactory.DEBUG_MIN` for less verbose logging than `logging.DEBUG`.
+- **user_shell_command** (Optional): The command to launch the shell as a list (default: ['/bin/bash', '-l']).
+- **shutdown_event** (Optional): An event to signal a shutdown request.
+- **shell_logout_wait** (Optional): Seconds to wait for a graceful shell logout (default: 1 second).
+- **shell_terminate_wait** (Optional): Seconds to wait before forcefully terminating the shell with SIGKILL (default: 3 seconds).
+- **auth_timeout** (Optional): Timeout in seconds for receiving authentication data (default: 5 seconds).
