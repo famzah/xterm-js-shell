@@ -1,7 +1,23 @@
 # xterm-js-shell
 Start a direct web Bash shell using Xterm.js - no SSH connection required. This is a single-user shell that runs with the privileges of the process that started it, and it can handle multiple simultaneous connections.
 
-![zzz](screenshot-xterm.png)
+![screenshot](screenshot-xterm.png)
+
+This project has not been tested at scale but has passed a ChatGPT code audit and is expected to be fully functional.
+
+# Usage
+You need to create your own "asyncio" server and then pass the "websocket" connections to the WebSocketHandler which is provided by "websocket_handler". The "server_example.py" shows how to implement a server. To run the current example:
+- Run "server_example.py" which starts a WebSocket server on TCP port 8765.
+- Serve "index.html" from a web server like Apache or Nginx on the same host that you started the WebSocket server.
+- Open "index.html" in a web browser.
+
+Authentication notes:
+- If you started "server_example.py" with the option "noauth", open "index.html" without any GET parameters.
+- If you started "server_example.py" with the option "auth", open "index.html?auth_example=letmein" in your browser to activate the sample authentication process.
+
+Production use:
+- Do not expose the WebSocket server directly to the internet. Instead, use a web proxy like Apache or Nginx to provide SSL termination and forward connections locally.
+- The WebSocket server can also listen on a UNIX socket for enhanced security. Restrict access to the UNIX socket file so only the web proxy can connect.
 
 # Architecture
 The project is based on "asyncio" and supports authentication, detailed logging, and graceful shell termination.
@@ -16,5 +32,3 @@ Example authentication process:
 - The authentication system generates a JWT token. Up to this point, the web shell server is not involved, yet.
 - The web "index.html" page then connects to the web shell server and provides the JWT token.
 - The JWT token is validated by the implementation of auth_callback().
-
-This project has not been tested at scale but has passed a ChatGPT code audit and is expected to be fully functional.
