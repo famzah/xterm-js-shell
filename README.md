@@ -6,7 +6,7 @@ Start a direct web Bash shell using Xterm.js - no SSH connection required. This 
 This project has not been tested at scale but has passed a ChatGPT code audit and is expected to be fully functional.
 
 # Usage
-You need to create your own "asyncio" server and then pass the "websocket" connections to the WebSocketHandler which is provided by "websocket_handler". The "server_example.py" shows how to implement a server. To run the current example:
+You need to create your own "asyncio" server and then pass the "websocket" connections to the WebSocketHandler which is provided by "websocket_handler.py". The "server_example.py" shows how to implement a server. To run the current example:
 - Run "server_example.py" which starts a WebSocket server on TCP port 8765.
 - Serve "index.html" from a web server like Apache or Nginx on the same host that you started the WebSocket server.
 - Open "index.html" in a web browser.
