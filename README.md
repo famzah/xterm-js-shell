@@ -16,13 +16,13 @@ Authentication notes:
 - If you started "server_example.py" with the option "auth", open "index.html?auth_example=letmein" in your browser to activate the sample authentication process.
 
 Production use:
-- Do not expose the WebSocket server directly to the internet. Instead, use a web proxy like Apache or Nginx to provide SSL termination and forward connections locally.
+- Do not expose the WebSocket server directly to the Internet. Instead, use a web proxy like Apache or Nginx to provide SSL termination and forward connections locally.
 - The WebSocket server can also listen on a UNIX socket for enhanced security. Restrict access to the UNIX socket file so only the web proxy can connect.
 
 # Architecture
 The project is based on "asyncio" and supports authentication, detailed logging, and graceful shell termination.
 
-The graceful termination feature allows you to run the web shell server in a "socket activation" mode. You can start the server on demand and terminate it when there are no active connections for a while. A typical use case is to launch the web shell server as part of the initial authentication process.
+The graceful termination feature allows you to terminate any active shell connections when you want to terminate the WebSocket server. If the shell won't terminate gracefully, a KILL signal is sent after a timeout.
 
 The [asyncio web server](https://websockets.readthedocs.io/en/stable/reference/asyncio/server.html#creating-a-server) can bind to either a TCP port or a UNIX socket. The latter is particularly useful when starting a web shell server on demand for each user. You can create a unique UNIX socket filename for each user's server in a secure path. WebSocket HTTP requests can then be proxied to the appropriate UNIX socket using a user-friendly URL format such as "wss://example.com/xterm-js-shell/user1".
 
